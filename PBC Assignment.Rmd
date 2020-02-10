@@ -1,0 +1,357 @@
+---
+title: "Mayo Clinic Primary Biliary Cirrhosis Data"
+author: "Priscilla Mungai"
+date: "January 5, 2020"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+Description: Mayo Clinic trial in primary biliary cirrhosis (PBC)
+---
+This data is from the Mayo Clinic trial in primary biliary cirrhosis (PBC) of the liver conducted between 1974 and 1984. A total of 424 PBC patients, referred to Mayo Clinic during that ten-year interval, met eligibility criteria for the randomized placebo controlled trial of the drug D-penicillamine. The first 312 cases in the data set participated in the randomized trial and contain largely complete data. The additional 112 cases did not participate in the clinical trial, but consented to have basic measurements recorded and to be followed for survival. Six of those cases were lost to follow-up shortly after diagnosis, so the data here are on an additional 106 cases as well as the 312 randomized participants.
+
+```{r}
+library(rmarkdown)
+library(survival)
+```
+
+```{r}
+## Description of the data
+?pbc
+```
+
+```{r}
+## Examine the structure of pbc
+str(pbc)
+```
+
+```{r}
+## Examine the summary of pbc
+summary(pbc)
+```
+
+```{r}
+## Create a new column of time in years
+dat <- pbc
+dat$time_in_years <- dat$time/365.25
+```
+
+
+```{r}
+## Select only the data of the 312 randomized participants for this study
+ndat <- dat[1:312,]
+```
+
+```{r}
+## Create a variable called event and change all the status of the patients who received transplants to 0 - Assumption: patients who received transplants  did not experience death and are still alive hence censored. 
+table(ndat$status)
+ndat$event <- 0 + (ndat$status == 2)
+
+with(ndat, table(status,event))
+```
+
+```{r}
+## Change edema to a factor
+ndat$edema <-factor(ndat$edema, levels = seq(0,1, by = 0.5) , labels =c("no edema", "untreated or successfully treated", "edema despite diuretic therapy"))
+## Change hepato to a factor
+ndat$hepato <- factor(ndat$hepato, levels = 0:1, labels = c("no hepatomegaly", "hepatomegaly"))
+## Change spiders to a factor
+ndat$spiders <- factor(ndat$spiders, levels = 0:1, labels = c("no spiders", "spiders"))
+## Change trt to a factor
+ndat$trt <- factor(ndat$trt, levels = 1:2, labels = c("D-penicillmain", "placebo"))
+## Change ascites to a factor
+ndat$ascites <- factor(ndat$ascites, levels = 0:1, labels = c("no ascites", "ascites"))
+## Change stage to a factor
+ndat$stage <- factor(ndat$stage, levels = 1:4, labels = c("1", "2", "3", "4"))
+```
+
+```{r}
+## Explore the data set
+## Examine the summary of ndat
+summary(ndat)
+```
+
+```{r}
+## remove missing values
+ndat <- na.omit(ndat)
+summary(ndat)
+```
+
+```{r}
+## Explore the data set
+## examine patients by age through a histogram
+hist(ndat$age)
+```
+
+```{r}
+## Explore the data set
+## examine patients by age
+## Conclusion : based on the median value, the younger you are the more time in years it will take to reach 50% survival i.e longer time to experience a fatality
+## Age category 50-70 has the highest number of censored patients
+library(survival)
+ndat$ageCat <- cut(ndat$age, breaks = c(0, 50, 70, Inf))
+agefit <- survfit(Surv(time_in_years, event)~ ageCat , data = ndat)
+agefit
+```
+
+```{r}
+plot(agefit, col = 1:3 ,mark.time = FALSE,
+      main = "Kaplan-Meir Estimator- Age",
+     ylab = "Survival Probability",
+     xlab = "Time(years)")
+legend("topright", c("ageCat=(0,50] ", "ageCat=(50,70]","ageCat=(70,Inf]"), lty=c(1,1), col = c("black","red", "green"), cex = 0.75)
+```
+
+```{r}
+## patients with no hepatomology do not drop to 50% survival at the end of the study hence their median value is NA
+## In 6.26 years half of the 75 uncensored patients with hepatomology experience fatality
+hepatofit <- survfit(Surv(time_in_years, event)~ hepato, data = ndat)
+hepatofit
+```
+
+```{r}
+N <- length(unique(ndat$hepato))
+plot(hepatofit, col = 1:2 ,mark.time = FALSE,
+      main = "Kaplan-Meir Estimator- Hepatomegaly",
+     ylab = "Survival Probability",
+     xlab = "Time(years)")
+legend("topright", c("no hepatomegaly", "hepatomegaly"), lty=c(1,1), col = c("black","red"), cex = 0.75)
+
+```
+
+```{r}
+## patients with presence of ascites have higher uncensored events and reach 50% survival faster than patients with no ascites. 
+## In 0.914 years half of the 18 uncensored patients with presence of ascites experience fatality.
+## In 9.43 years half of the 93 uncensored patients with no presence of ascites experience fatality
+ascitesfit <- survfit(Surv(time_in_years, event)~ ascites, data = ndat)
+ascitesfit
+```
+
+```{r}
+plot(ascitesfit, col = 1:2 ,mark.time = FALSE,
+      main = "Kaplan-Meir Estimator- Ascites",
+     ylab = "Survival Probability",
+     xlab = "Time(years)")
+legend("topright", c("no ascites", "ascites"), lty=c(1,1), col = c("black","red"), cex = 0.75)
+```
+
+```{r}
+## patients with no edema : 50% of the patients survive upto 9.785 years
+## patients with untreated or successfully treated edema : 50% of patients survive upto 3.26 years
+## patients with edema despite diuretic therapy: 50% of patients survive upto 0.723 years ( roughly 9 months)
+edemafit <- survfit(Surv(time_in_years, event)~ edema, data = ndat)
+edemafit
+```
+
+```{r}
+plot(edemafit, col = 1:3 ,mark.time = FALSE,
+      main = "Kaplan-Meir Estimator- Edema",
+     ylab = "Survival Probability",
+     xlab = "Time(years)")
+legend("topright", c("no edema", "untreated or successfully treated", "edema despite diuretic therapy"), lty=c(1,1), col = c("black","red", "green"), cex = 0.68)
+```
+
+```{r}
+## patients with no spiders : 50% of the patients survive upto 10.51 years
+## patients with spiders : 50% of the patients survive upto 5.06 years
+spiderfit <- survfit(Surv(time_in_years, event)~ spiders, data = ndat)
+spiderfit
+```
+
+```{r}
+plot(spiderfit, col = 1:2 ,mark.time = FALSE,
+      main = "Kaplan-Meir Estimator- Spiders",
+     ylab = "Survival Probability",
+     xlab = "Time(years)")
+legend("topright", c("no spiders", "spiders"), lty=c(1,1), col = c("black","red", "green"), cex = 0.75)
+```
+
+```{r}
+## log rank test for presence of hepatomegaly or enlarged liver
+## small p value, therefore reject the null hypothesis
+## there is evidence that the 2 groups(patients with hepetomegaly and patients without hepatomegaly) experience a different survival
+survdiff(Surv(time_in_years, event)~ hepato, data = ndat)
+```
+
+```{r}
+## Cox Proportional Hazard
+## p value is small - Therefore reject the null hypothesis that beta =0
+## Since beta is not equal to zero there is impact of the categorical variable (hepato) on the risk
+## Conclude that the two groups have different survival
+## exp(coef)= 2.78. Interpretation = the risk of experiencing the event(fatality)
+## for a patient with presence of hepatomegaly is 2.78 times that of a patient with no hepatomegaly
+coxhepato <- coxph(Surv(time_in_years, event) ~ hepato, data = ndat)
+summary(coxhepato)
+```
+
+```{r}
+## p value is small - Therefore reject the null hypothesis that beta =0
+## Since beta is not equal to zero there is impact of the categorical variable (ascites) on the risk
+## Conclude that the two groups have different survival
+## exp(coef)= 9.9704. Interpretation = the risk of experiencing the event(fatality)
+## for a patient with presence of ascites is 9.9704 times that of a patient with no ascites
+coxascites <- coxph(Surv(time_in_years, event) ~ ascites, data = ndat)
+summary(coxascites)
+```
+
+```{r}
+## p value is small - Therefore reject the null hypothesis that beta =0
+## Since beta is not equal to zero there is impact of the categorical variable (edema) on the risk
+## Conclude that the three groups have different survival
+## exp(coef)= 2.573. Interpretation = the risk of experiencing the event(fatality)
+## for a patient with untreated or successfully treated edema is 2.573 times that of a patient with no edema
+## exp(coef)= 11.123. Interpretation = the risk of experiencing the event(fatality)
+## for a patient with edema is 11.123 times that of a patient with no edema
+coxedema <- coxph(Surv(time_in_years, event) ~ edema, data = ndat)
+summary(coxedema)
+```
+
+```{r}
+## Cox Proportional Hazard
+## p value is small - Therefore reject the null hypothesis that beta =0
+## Since beta is not equal to zero there is impact of the categorical variable (stage) on the risk
+## Conclude that the four groups have different survival
+## exp(coef)= 3.808. Interpretation = the risk of experiencing the event(fatality)
+## for a patient at stage 2 is 3.8 times that of a patient at stage 1
+coxstage <- coxph(Surv(time_in_years, event) ~ stage, data = ndat)
+summary(coxstage)
+```
+```{r}
+## COMPARE NESTED MODELS
+## Using Cox Proportional Hazard, create 4 candidate models to select from
+M0 <- coxph(Surv(time_in_years, event) ~ 1, data = ndat)
+M1 <- coxph(Surv(time_in_years, event) ~ ascites, data = ndat)
+M2 <- coxph(Surv(time_in_years, event) ~ hepato, data = ndat)
+M3 <- coxph(Surv(time_in_years, event) ~ ascites + hepato , data = ndat)
+```
+
+```{r}
+## Compare the nested models LRT
+## Small p value hence reject the null hypothesis that the coefficients associated to hepatomegaly are both equal to zero
+## Conclusion: Select Model 3 as the best model
+anova(M1,M3)
+```
+
+```{r}
+## COMPARE NON-NESTED MODELS : AIC
+## M3 (model 3) has the smallest AIC result so it's the best model
+fits <- list(M1 = M1, M2 = M2 , M3 = M3)
+## Apply AIC to each of the elements of the list and collect the results as a vecto
+sapply(fits, AIC)
+```
+
+```{r}
+## Stepwise model selection based on AIC
+## Model removes stage variable and provides the best model after 1 step
+Mfull <- coxph(Surv(time_in_years, event) ~ sex + ascites + edema + hepato + ageCat + spiders + stage, data = ndat)
+MAIC <- step(Mfull)
+```
+ 
+```{r}
+## MAIC model from selection based model has a Harell's Concordance metric of 76.8%
+summary(MAIC)
+```
+
+```{r}
+library(survivalROC)
+plot(survfit(Surv(time_in_years, event) ~1, data = ndat))
+```
+
+```{r}
+## Calculate ROC measure. ROC is a performance measurement of classification problems given a threshold setting.It provides the diagnostic ability of a binary classifier system.
+ROC.platelet <- survivalROC(Stime = ndat$time_in_years,
+                          status = ndat$event,
+                          marker = ndat$platelet,
+                          predict.time = 9,
+                          method = "KM")
+ROC.protime <- survivalROC(Stime = ndat$time_in_years,
+                          status = ndat$event,
+                          marker = ndat$protime,
+                          predict.time = 9,
+                          method = "KM")
+```
+
+```{r}
+## Calculate AUC which is a measure of separability. Separabilty is how the model is capable of distinguishing between classes. The higher the AUC the better.
+## Conclusion: We are better discriminating survival at 9 years with standardised blood clotting time rather than platelet count
+ROC <- list(PBC.Platelet = ROC.platelet, PBC.Protime = ROC.protime)
+sapply(ROC, "[[", "AUC")
+```
+
+```{r}
+## for every one unit increase of standardized blood clotting time, the hazard ratio becomes 1.4 more times than the previous unit
+## Conclusion: for every one unit increase in standardized blood clotting time, a patient becomes 1.4 more times more likely to experience fatality
+ coxph(Surv(time_in_years, event) ~ protime, data = ndat)
+```
+
+```{r}
+dfl <- lapply(ROC , function(x) with(x, data.frame(FP, TP)))
+for(nm in names(dfl)) {
+  dfl[[nm]]$marker <- nm
+}
+rocdata <- do.call(rbind, dfl)
+ 
+```
+
+```{r}
+library(ggplot2)
+## Plot the two ROC curves for protime and platelet variables TO SEE HOW THE FALSE POSITIVE AND TRUE POSITIVE RATE CHANGE DEPENDING ON 9 YEARS
+## X axis is FP rate
+## Y axis is TP rate
+ggplot(rocdata, aes(FP, TP, color = marker)) + geom_line() + theme_bw(base_size = 9)
+```
+
+```{r}
+## What is the smallest cut.value such that the false positive rate is no more than 10% ?
+cutoff <- with(ROC$PBC.Protime, min(cut.values[FP <= 0.1]))
+## plot the survival of a patient classsified as low risk vs a patient classified as high risk. Base this on the cut off value.
+ndat$prediction <- ifelse(ndat$protime <= cutoff, "low_risk" , "high_risk")
+## a patient classified as low risk has a much higher median survial time as compared to a patient classified as low risk
+## Conclusion : After 12 years(end of study) , high risk patients have about 10% survival while low risk patients have about 50% survival
+plot(survfit(Surv(time_in_years, event) ~ prediction, data = ndat), col = c("red", "blue"))
+```
+
+```{r}
+## MODEL DIAGNOSTICS
+## There is no pattern of association between age and the residuals
+## There is no pattern of association between presence of hepatomegaly and the residuals
+## There is no pattern of association between presence of spiders and the residuals
+## Problem : There is a pattern of association between edema status and the residuals 
+
+
+martingalefit <- coxph(Surv(time_in_years, event) ~ sex + ascites + 
+    edema + hepato + ageCat + spiders, data = ndat)
+ndat$residual <- residuals(martingalefit, type = "martingale")
+
+with(ndat, {
+  
+  plot(age, residual)
+  lines (lowess(age, residual), lwd = 2)
+  plot(residual ~ edema)
+  plot(residual ~ hepato)
+  plot(residual ~ spiders)
+})
+```
+
+```{r}
+## PROPORTIONALITY OF HAZARDS - Schoenfeld Residuals
+## Null hypothesis : There is proportionality of hazards for this survival.
+## Conclusion - Samall p value for edema varaiable, therefore reject proportionality of hazards for the survival using edema status.
+residual.sch <- cox.zph(MAIC)
+residual.sch
+ 
+```
+
+```{r}
+## Stratify for edema status to determine the proportional hazards for the rest of the selected variables.
+stratfit <- coxph(Surv(time_in_years) ~ sex + ascites + hepato + ageCat + spiders + strata(edema), data = ndat)
+summary (stratfit)
+```
+
+```{r}
+```
+
+
+
+
